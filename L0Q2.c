@@ -1,129 +1,131 @@
+//Jennifer do Nascimento e Vinicius dos Santos
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 #include <math.h>
+#include <ctype.h>
 
-typedef enum { STRING, INTEIRO, REAL, PONTO } Tipo;
+#define MAX_LINE 512
+
 
 typedef struct {
-    Tipo tipo;
-    union {
-        char string[50];
-        int inteiro;
-        float real;
-        struct {
-            float x, y;
-        } ponto;
-    } valor;
-} Elemento;
-
-float distancia2(float x, float y) {
-    return x * x + y * y;
-}
-
-int cmp_str(const void *a, const void *b) {
-    return strcmp(((Elemento *)a)->valor.string, ((Elemento *)b)->valor.string);
-}
+    float x, y;
+} Ponto;
 
 int cmp_int(const void *a, const void *b) {
-    return ((Elemento *)a)->valor.inteiro - ((Elemento *)b)->valor.inteiro;
+    return (*(int *)a - *(int *)b);
 }
 
 int cmp_float(const void *a, const void *b) {
-    float diff = ((Elemento *)a)->valor.real - ((Elemento *)b)->valor.real;
+    float diff = *(float *)a - *(float *)b;
     return (diff > 0) - (diff < 0);
 }
 
+int cmp_str(const void *a, const void *b) {
+    return strcmp(*(char **)a, *(char **)b);
+}
+
+float distancia(Ponto p) {
+    return sqrt(p.x * p.x + p.y * p.y);
+}
+
 int cmp_ponto(const void *a, const void *b) {
-    float d1 = distancia2(((Elemento *)a)->valor.ponto.x, ((Elemento *)a)->valor.ponto.y);
-    float d2 = distancia2(((Elemento *)b)->valor.ponto.x, ((Elemento *)b)->valor.ponto.y);
+    float d1 = distancia(*(Ponto *)a);
+    float d2 = distancia(*(Ponto *)b);
     return (d1 > d2) - (d1 < d2);
 }
 
-int main() {
-    FILE *fin = fopen("L0Q2.in", "r");
-    FILE *fout = fopen("L0Q2.out", "w");
+int is_integer(const char *s) {
+    if (*s == '-' || *s == '+') s++;
+    if (!*s) return 0;
+    while (*s) {
+        if (!isdigit(*s)) return 0;
+        s++;
+    }
+    return 1;
+}
 
-    if (!fin || !fout) {
-        printf("Erro ao abrir arquivos.\n");
+int is_float(const char *s) {
+    int dot = 0;
+    if (*s == '-' || *s == '+') s++;
+    if (!*s) return 0;
+    while (*s) {
+        if (*s == '.') {
+            if (dot) return 0;
+            dot = 1;
+        } else if (!isdigit(*s)) {
+            return 0;
+        }
+        s++;
+    }
+    return dot;
+}
+
+int main() {
+    
+    FILE *entrada = fopen("L0Q2.in", "r");
+    FILE *saida = fopen("L0Q2.out", "w");
+
+    if (!entrada || !saida) {
+        perror("Erro ao abrir arquivos");
         return 1;
     }
+    
+    char linha[MAX_LINE];
 
-    Elemento strings[100], inteiros[100], reais[100], pontos[100];
-    int s = 0, i = 0, r = 0, p = 0;
+    while (fgets(linha, MAX_LINE, entrada)) {
+        char *strings[100]; int qtd_s = 0;
+        int inteiros[100], qtd_i = 0;
+        float floats[100]; int qtd_f = 0;
+        Ponto pontos[100]; int qtd_p = 0;
 
-    char token[1000];
+        char *token = strtok(linha, " \n");
 
-    while (fscanf(fin, "%s", token) != EOF) {
-        float x, y;
-        int inteiro;
-        float real;
+        while (token) {
+            if (token[0] == '(') {
+                float x, y;
+                sscanf(token, "(%f,%f)", &x, &y);
+                pontos[qtd_p++] = (Ponto){x, y};
+            }
+            else if (is_integer(token)) {
+                inteiros[qtd_i++] = atoi(token);
+            }
+            else if (is_float(token)) {
+                floats[qtd_f++] = atof(token);
+            }
+            else {
+                strings[qtd_s] = malloc(strlen(token) + 1);
+                strcpy(strings[qtd_s++], token);
+            }
 
-        // Verifica se é ponto
-        if (sscanf(token, "(%f,%f)", &x, &y) == 2) {
-            pontos[p].tipo = PONTO;
-            pontos[p].valor.ponto.x = x;
-            pontos[p].valor.ponto.y = y;
-            p++;
+            token = strtok(NULL, " \n");
         }
-        // Verifica se é inteiro
-        else if (sscanf(token, "%d", &inteiro) == 1 && strchr(token, '.') == NULL) {
-            inteiros[i].tipo = INTEIRO;
-            inteiros[i].valor.inteiro = inteiro;
-            i++;
-        }
-        // Verifica se é real
-        else if (sscanf(token, "%f", &real) == 1 && strchr(token, '.') != NULL) {
-            reais[r].tipo = REAL;
-            reais[r].valor.real = real;
-            r++;
-        }
-        // Senão, é string
-        else {
-            strings[s].tipo = STRING;
-            strncpy(strings[s].valor.string, token, sizeof(strings[s].valor.string));
-            s++;
-        }
+
+        qsort(strings, qtd_s, sizeof(char *), cmp_str);
+        qsort(inteiros, qtd_i, sizeof(int), cmp_int);
+        qsort(floats, qtd_f, sizeof(float), cmp_float);
+        qsort(pontos, qtd_p, sizeof(Ponto), cmp_ponto);
+
+        fprintf(saida,"str:");
+        for (int i = 0; i < qtd_s; i++) fprintf(saida, "%s ", strings[i]);
+
+        fprintf(saida, " int:");
+        for (int i = 0; i < qtd_i; i++) fprintf(saida, "%d ", inteiros[i]);
+
+        fprintf(saida, " float:");
+        for (int i = 0; i < qtd_f; i++) fprintf(saida, "%.2f ", floats[i]);
+
+        fprintf(saida, " p:");
+        for (int i = 0; i < qtd_p; i++) fprintf(saida, "(%.1f,%.1f) ", pontos[i].x, pontos[i].y);
+
+        fprintf(saida, "\n");
+
+        for (int i = 0; i < qtd_s; i++) free(strings[i]);
     }
+    
+    fclose(entrada);
+    fclose(saida);
 
-    // Ordenar
-    qsort(strings, s, sizeof(Elemento), cmp_str);
-    qsort(inteiros, i, sizeof(Elemento), cmp_int);
-    qsort(reais, r, sizeof(Elemento), cmp_float);
-    qsort(pontos, p, sizeof(Elemento), cmp_ponto);
-
-    // Saída formatada no arquivo
-    if (s > 0) {
-        fprintf(fout, "str:");
-        for (int j = 0; j < s; j++) {
-            fprintf(fout, "%s%s", j == 0 ? "" : " ", strings[j].valor.string);
-        }
-        fprintf(fout, "\n");
-    }
-
-    if (i > 0) {
-        fprintf(fout, "int:");
-        for (int j = 0; j < i; j++) {
-            fprintf(fout, "%d%s", inteiros[j].valor.inteiro, j == i - 1 ? "\n" : " ");
-        }
-    }
-
-    if (r > 0) {
-        fprintf(fout, "float:");
-        for (int j = 0; j < r; j++) {
-            fprintf(fout, "%.2f%s", reais[j].valor.real, j == r - 1 ? "\n" : " ");
-        }
-    }
-
-    if (p > 0) {
-        fprintf(fout, "p:");
-        for (int j = 0; j < p; j++) {
-            fprintf(fout, "(%.1f,%.1f)%s", pontos[j].valor.ponto.x, pontos[j].valor.ponto.y, j == p - 1 ? "\n" : " ");
-        }
-    }
-
-    fclose(fin);
-    fclose(fout);
     return 0;
 }
